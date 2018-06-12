@@ -11,7 +11,7 @@ public class SocketClient {
 	public static void main(String[] args) {
 		Socket socket = null;
 		try {
-			socket = new Socket("192.168.5.12", 6002);
+			socket = new Socket("192.168.5.122", 6002);
 			HandleMsg responseHandle = new HandleMsg(socket);
 			Thread thread = new Thread(responseHandle);
 			thread.start();

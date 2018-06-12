@@ -2,6 +2,7 @@ package net.dxs.client.handle;
 
 import net.dxs.client.bean.request.Message;
 
+import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 
 public class HandleEventNotify {
@@ -19,7 +20,7 @@ public class HandleEventNotify {
 		}
 		return instance;
 	}
-	
+
 	public void handleMsg(HandleMsg handleMsg, JSONObject jObj) {
 		this.mMandleMsg = handleMsg;
 		this.mJObj = jObj;
@@ -102,16 +103,48 @@ public class HandleEventNotify {
 	}
 
 	private void handleAudioPlayFinishEvent(JSONObject data) {
-		String data2 = mJObj.getJSONObject("content").getJSONObject("param")
-				.getJSONObject("service_param").getString("data");
-		JSONObject object = JSONObject.parseObject(data2);
-		String service_name = object.getString("service_name");
+//		String data2 = mJObj.getJSONObject("content").getJSONObject("param")
+//				.getJSONObject("service_param").getString("data");
+//		JSONObject object = JSONObject.parseObject(data2);
+//		String service_name = object.getString("service_name");
 		
-		if ("default@AudioPlayExtModule".equals(service_name)) {
+
+		String event_name = mJObj.getJSONObject("content").getJSONObject("param")
+				.getJSONObject("service_param").getString("event_name");
+
+		if ("audio_play_finish_event".equals(event_name)) {
+			System.out.println("开始触摸屏幕");
+			try {
+				Thread.sleep(2000);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			Message msg = new Message();
 			msg.header.type = "31034";
 			msg.header.session_id = mMandleMsg.getSession_id();
-			msg.header.serial_number = mMandleMsg.getSerial_number();
+			msg.header.serial_number = String.format("%010d",
+					Integer.parseInt(mMandleMsg.getSerial_number(mJObj)) + 1);
+			msg.content.param.service_name = "CustomEvent";
+			JSONObject jsonObject = new JSONObject();
+			jsonObject.put("service_name", "customer_operation_service");
+			jsonObject.put("service_param", new JSONObject());
+			msg.content.param.service_param = jsonObject;
+			mMandleMsg.sendMsg(msg.toString());
+		}
+		
+		if ("audio_play_finish_event".equals(event_name)) {
+			System.out.println("播放");
+			try {
+				Thread.sleep(2000);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			Message msg = new Message();
+			msg.header.type = "31034";
+			msg.header.session_id = mMandleMsg.getSession_id();
+			msg.header.serial_number = mMandleMsg.getSerial_number(mJObj);
 			msg.content.param.service_name = "CustomEvent";
 			JSONObject jsonObject = new JSONObject();
 			jsonObject.put("service_name", "Play_Custom_Text_Event");
@@ -123,18 +156,35 @@ public class HandleEventNotify {
 			mMandleMsg.sendMsg(msg.toString());
 		}
 
-		if ("default@AudioPlayExtModule".equals(service_name)) {
-			Message msg = new Message();
-			msg.header.type = "31034";
-			msg.header.session_id = mMandleMsg.getSession_id();
-			msg.header.serial_number = String.format("%010d", Integer.parseInt(mMandleMsg.getSerial_number()) + 1);
-			msg.content.param.service_name = "CustomEvent";
-			JSONObject jsonObject = new JSONObject();
-			jsonObject.put("service_name", "customer_operation_service");
-			jsonObject.put("service_param", new JSONObject());
-			msg.content.param.service_param = jsonObject;
-			mMandleMsg.sendMsg(msg.toString());
-		}
+//		if ("default@AudioPlayExtModule".equals(service_name)) {
+//			Message msg = new Message();
+//			msg.header.type = "31034";
+//			msg.header.session_id = mMandleMsg.getSession_id();
+//			msg.header.serial_number = mMandleMsg.getSerial_number(mJObj);
+//			msg.content.param.service_name = "CustomEvent";
+//			JSONObject jsonObject = new JSONObject();
+//			jsonObject.put("service_name", "Play_Custom_Text_Event");
+//			JSONObject jsonObject2 = new JSONObject();
+//			jsonObject2.put("text", "快3当期投注已截止请购买下一期");
+//			jsonObject.put("service_param", jsonObject2);
+//
+//			msg.content.param.service_param = jsonObject;
+//			mMandleMsg.sendMsg(msg.toString());
+//		}
+
+//		if ("default@AudioPlayExtModule".equals(service_name)) {
+//			Message msg = new Message();
+//			msg.header.type = "31034";
+//			msg.header.session_id = mMandleMsg.getSession_id();
+//			msg.header.serial_number = String.format("%010d",
+//					Integer.parseInt(mMandleMsg.getSerial_number(mJObj)) + 1);
+//			msg.content.param.service_name = "CustomEvent";
+//			JSONObject jsonObject = new JSONObject();
+//			jsonObject.put("service_name", "customer_operation_service");
+//			jsonObject.put("service_param", new JSONObject());
+//			msg.content.param.service_param = jsonObject;
+//			mMandleMsg.sendMsg(msg.toString());
+//		}
 	}
 
 	private void handleAnswerTypeEvent(JSONObject data) {

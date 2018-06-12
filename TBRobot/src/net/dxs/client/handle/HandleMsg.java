@@ -7,7 +7,6 @@ import java.io.OutputStream;
 import java.net.Socket;
 
 import net.dxs.client.bean.request.Message;
-import net.dxs.client.bean.request.MessageInit;
 import net.dxs.client.utils.MsgUtils;
 import net.dxs.client.utils.WLog;
 
@@ -38,7 +37,12 @@ public class HandleMsg implements Runnable {
 			InputStream is = mSocket.getInputStream();
 			mOs = mSocket.getOutputStream();
 
-			MessageInit msg = new MessageInit();
+			Message msg = new Message();
+			msg.header.type = "31018";
+			JSONObject jsonObject = new JSONObject();
+			jsonObject.put("app_name", "tdrobotterminalapp");
+			jsonObject.put("strategy_name", "tdrobotterminalapp");
+			msg.content.param.service_param = jsonObject;
 			sendMsg(msg.toString());
 
 			BufferedInputStream bufis = new BufferedInputStream(is);
@@ -53,13 +57,16 @@ public class HandleMsg implements Runnable {
 			e.printStackTrace();
 		}
 	}
-	
+
 	public String getSession_id() {
 		return session_id;
 	}
 
-	public String getSerial_number() {
-		return serial_number;
+	public String getSerial_number(JSONObject jObj) {
+		return String.format(
+				"%010d",
+				Integer.parseInt(jObj.getJSONObject("header").getString(
+						"serial_number")) + 1);
 	}
 
 	/**
@@ -139,16 +146,46 @@ public class HandleMsg implements Runnable {
 	 * @param jObj
 	 */
 	private void switchNotify(JSONObject jObj) {
+		String state_name = jObj.getJSONObject("content")
+				.getJSONObject("param").getJSONObject("service_param")
+				.getString("state_name");
 		Message msg = new Message();
 		msg.header.type = "31016";
 		msg.header.session_id = this.session_id;
 		msg.header.serial_number = this.serial_number;
-		String state_name = jObj.getJSONObject("content")
-				.getJSONObject("param").getJSONObject("service_param")
-				.getString("state_name");
 		msg.content.param.service_name = "Switch";
 		JSONObject jsonObject = new JSONObject();
 		jsonObject.put("state_name", state_name);
+		msg.content.param.service_param = jsonObject;
+		sendMsg(msg.toString());
+	}
+
+	private void switchNotify_playCustomTextEvent(JSONObject jObj) {
+		Message msg = new Message();
+		msg.header.type = "31034";
+		msg.header.session_id = getSession_id();
+		msg.header.serial_number = getSerial_number(jObj);
+		msg.content.param.service_name = "CustomEvent";
+		JSONObject jsonObject = new JSONObject();
+		jsonObject.put("service_name", "Play_Custom_Text_Event");
+		JSONObject jsonObject2 = new JSONObject();
+		jsonObject2.put("text", "快3当期投注已截止请购买下一期");
+		jsonObject.put("service_param", jsonObject2);
+
+		msg.content.param.service_param = jsonObject;
+		sendMsg(msg.toString());
+	}
+
+	private void switchNotify_customer(JSONObject jObj) {
+		Message msg = new Message();
+		msg.header.type = "31034";
+		msg.header.session_id = this.session_id;
+		msg.header.serial_number = String.format("%010d",
+				Integer.parseInt(getSerial_number(jObj)) + 1);
+		msg.content.param.service_name = "CustomEvent";
+		JSONObject jsonObject = new JSONObject();
+		jsonObject.put("service_name", "customer_operation_service");
+		jsonObject.put("service_param", new JSONObject());
 		msg.content.param.service_param = jsonObject;
 		sendMsg(msg.toString());
 	}
@@ -174,7 +211,7 @@ public class HandleMsg implements Runnable {
 		msg.content.param.service_param = jsonObject;
 		sendMsg(msg.toString());
 		// 切换屏保
-		handleScreenSaver(jObj);
+//		handleScreenSaver(jObj);
 	}
 
 	/**
@@ -183,9 +220,36 @@ public class HandleMsg implements Runnable {
 	 * @param jObj
 	 */
 	private void handleScreenSaver(JSONObject jObj) {
-		String detail = jObj.getJSONObject("content").getJSONObject("param")
+		String cur_state = jObj.getJSONObject("content").getJSONObject("param")
 				.getJSONObject("result").getJSONObject("detail")
 				.getString("cur_state");
+		System.out.println("切换屏保：" + jObj.toString());
+		
+		if("PrepareService".equals(cur_state)){
+			
+		} else if("WaitingService@TargetSearching@StaticSearching".equals(cur_state)) {
+			String service = "SetData";
+			JSONObject params = new JSONObject();
+			JSONArray data = new JSONArray();
+
+			JSONArray robotStateSetParasArr = new JSONArray();
+			JSONObject robotStateSetParasJObj = new JSONObject();
+			robotStateSetParasJObj.put("robotState", "OnService");
+			robotStateSetParasJObj.put("stateLevel", 0);
+			robotStateSetParasArr.add(robotStateSetParasJObj);
+			
+			
+			JSONObject key1 = new JSONObject();
+			key1.put("key", "robotStateSet");
+			key1.put("value", robotStateSetParasArr);
+			data.add(key1);
+
+			params.put("data", data);
+			emitMessage(service, params);
+		} else {
+			switchNotify_customer(jObj);
+		}
+		
 
 		// this.$logger.info('【info】新平台要切换的服务状态:', stateName)
 		// let saver = null
@@ -279,7 +343,7 @@ public class HandleMsg implements Runnable {
 		// TODO 待平台服务状态准备完成后，进行终端机构信息的获取，获取成功则进入应用
 		switchCount = switchCount + 1;
 		if (switchCount == 2) {
-			getSignResult();
+//			getSignResult();
 		}
 	}
 
@@ -352,45 +416,42 @@ public class HandleMsg implements Runnable {
 				.getJSONObject("result").getJSONObject("detail")
 				.getJSONArray("data");
 
-	      String signin_orgid = null;
-	      String signin_termid = null;
-	      int electricity = 0;
-	      int is_charging = 99;
-	      
-	      for (int i = 0,len=data.size(); i < len; i++) {
-	    	  JSONObject v = data.getJSONObject(i);
-	    	  String key = v.getString("key");
-	    	  String value = v.getString("value");
-	    	  if ("signin_orgid".equals(key)){
-	    		  signin_orgid = value;
-	    	  } else if("signin_termid".equals(key)){
-	    		  signin_termid = value;
-	    	  } else if("electricity".equals(key)){
-	    		  electricity = Integer.parseInt(value.trim());
-	    	  } else if("is_charging".equals(key)){
-	    		  is_charging = Integer.parseInt(value.trim());
-	    	  }
-	      }
-	      
-	      if (!MsgUtils.isEmpty(signin_orgid) && !MsgUtils.isEmpty(signin_termid)){
-	    	  JSONObject jsonObject = new JSONObject();
-	    	  jsonObject.put("signin_orgid", signin_orgid);
-	    	  jsonObject.put("signin_termid", signin_termid);
-	    	  System.out.println(jsonObject.toString());
-	    	  WLog.getInstance().saveLog2File_tdos(jsonObject.toString());
-	      }
-	      if (electricity != 0) {
-	    	  JSONObject jsonObject = new JSONObject();
-	    	  jsonObject.put("electricity", electricity);
-	    	  jsonObject.put("is_charging", is_charging);
-	    	  System.out.println(jsonObject.toString());
-	    	  WLog.getInstance().saveLog2File_tdos(jsonObject.toString());
-	      }
-	      if (is_charging != 99){
-	    	// 更新充电状态
-	    	  System.out.println(is_charging);
-	    	  WLog.getInstance().saveLog2File_tdos(String.valueOf(is_charging));
-	      }
+		String signin_orgid = null;
+		String signin_termid = null;
+		int electricity = 0;
+		int is_charging = 99;
+
+		for (int i = 0, len = data.size(); i < len; i++) {
+			JSONObject v = data.getJSONObject(i);
+			String key = v.getString("key");
+			String value = v.getString("value");
+			if ("signin_orgid".equals(key)) {
+				signin_orgid = value;
+			} else if ("signin_termid".equals(key)) {
+				signin_termid = value;
+			} else if ("electricity".equals(key)) {
+				electricity = Integer.parseInt(value.trim());
+			} else if ("is_charging".equals(key)) {
+				is_charging = Integer.parseInt(value.trim());
+			}
+		}
+
+		if (!MsgUtils.isEmpty(signin_orgid) && !MsgUtils.isEmpty(signin_termid)) {
+			JSONObject jsonObject = new JSONObject();
+			jsonObject.put("signin_orgid", signin_orgid);
+			jsonObject.put("signin_termid", signin_termid);
+			System.out.println(jsonObject.toString());
+		}
+		if (electricity != 0) {
+			JSONObject jsonObject = new JSONObject();
+			jsonObject.put("electricity", electricity);
+			jsonObject.put("is_charging", is_charging);
+			System.out.println(jsonObject.toString());
+		}
+		if (is_charging != 99) {
+			// 更新充电状态
+			System.out.println(is_charging);
+		}
 	}
 
 	/**
